@@ -1,0 +1,23 @@
+<aura:component >
+	
+    <aura:attribute name="wrapper" type="Object" /> 
+    
+    <aura:handler name="init" value="{!this}" action="{!c.doInit}"/>
+    
+    <lightning:card title="{!v.wrapper.product.Name}" >
+    
+        <aura:iteration items="{!v.wrapper.cvs}" var="cv" indexVar="{x}">
+            
+            <lightning:card title="{!cv.Title}" >
+                
+                <lightning:button onclick="{!c.handleButtonClick}"  label="{!cv.Id}">
+                    {!cv.Id}
+                </lightning:button>
+                
+            </lightning:card>
+            
+        </aura:iteration>
+    
+    </lightning:card>
+    
+</aura:component>

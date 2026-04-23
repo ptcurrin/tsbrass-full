@@ -1,0 +1,6 @@
+<design:component>
+	
+    <design:attribute name="recordId" label="Id of New Record(recordId)" />
+    <design:attribute name="thisRecordId" label="Id of New Record(thisRecordId)" />
+    
+</design:component>

@@ -1,0 +1,25 @@
+<aura:component controller="Product2_FileInspectorApex"
+                implements="force:appHostable,flexipage:availableForAllPageTypes,flexipage:availableForRecordHome,force:hasRecordId,forceCommunity:availableForAllPageTypes,force:lightningQuickAction" access="global" >
+	
+    Hello World!!! If the button prefix is "02s" then its attached to an email
+    
+    <aura:attribute name="productsList" type="List" default="[]"/>
+    <aura:attribute name="productsColumns" type="List" />
+    
+    
+    <aura:handler name="init" value="{!this}" action="{!c.doInit}"/>
+    
+    Products From Apex
+    
+    <!-- <lightning:treeGrid data="{! v.productsList }"
+        columns="{! v.productsColumns }"
+                         keyField="Id" />
+        - onrowselection="{! c.getSelectedName }"/> -->
+    
+    <aura:iteration items="{!v.productsList}" var="listWrapper" indexVar="{x}">
+        
+        <c:Product2_FileInspector_ProductDisplay wrapper="{!listWrapper}" />
+        
+    </aura:iteration>
+    
+</aura:component>

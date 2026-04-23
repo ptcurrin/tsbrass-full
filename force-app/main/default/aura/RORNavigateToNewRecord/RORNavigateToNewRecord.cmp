@@ -1,0 +1,8 @@
+<aura:component implements="force:lightningQuickAction,lightning:availableForFlowActions" access="global">
+    
+    <!--<aura:dependency resource="markup://force:navigateToSObject" type="EVENT"/>-->
+    <aura:attribute name="recordId" type="String" />
+    <aura:attribute name="thisRecordId" type="String" access="global" />
+    <!--<aura:handler name="doInit" value="{!this}" action="{!c.invoke}"/>-->
+	
+</aura:component>

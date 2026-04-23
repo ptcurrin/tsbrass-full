@@ -1,0 +1,1001 @@
+<aura:component controller="ProductFileComplianceController"
+                implements="flexipage:availableForAllPageTypes,force:appHostable"
+                access="global">
+
+    <!-- Shared state across tabs -->
+    <aura:attribute name="activeTabId" type="String" default="dashboard"/>
+    <aura:attribute name="selectedProductId" type="Id"/>
+    <aura:attribute name="selectedProductLabel" type="String"/>
+
+    <!-- Dashboard state -->
+    <aura:attribute name="searchTerm" type="String" default=""/>
+    <aura:attribute name="mode" type="String" default="ALL"/>
+    <aura:attribute name="pageNumber" type="Integer" default="1"/>
+    <aura:attribute name="pageSize" type="Integer" default="25"/>
+    
+    <aura:attribute name="totalFound" type="Integer" default="0"/>
+    <aura:attribute name="rangeLabel" type="String" default="0-0"/>
+    
+    
+    <aura:attribute name="rows" type="Object[]"/>
+    <aura:attribute name="hasMore" type="Boolean" default="false"/>
+    <aura:attribute name="isLoading" type="Boolean" default="false"/>
+
+    <!-- Global status (Tab 1/2/3 can use it) -->
+    <aura:attribute name="statusText" type="String" default=""/>
+
+    <aura:attribute name="columns" type="List" default="[
+        {'label':'Product Code','fieldName':'productCode','type':'text'},
+        {'label':'Product Name','fieldName':'productName','type':'text'},
+        {'label':'Canonical Saved','fieldName':'hasCanonical','type':'boolean'},
+        {'label':'Canonical Set At','fieldName':'canonicalSetAt','type':'date','typeAttributes':{'year':'numeric','month':'2-digit','day':'2-digit','hour':'2-digit','minute':'2-digit'}},
+        {'label':'Canonical Doc Id','fieldName':'canonicalDocId','type':'text'},
+        {'label':'Linked Spec PDFs','fieldName':'linkedSpecPdfDocs','type':'number'},
+        {'label':'Single Spec PDF','fieldName':'isSingleDoc','type':'boolean'},
+        {'label':'Status','fieldName':'status','type':'text'},
+        {'type':'action','typeAttributes':{'rowActions':[]}}
+    ]"/>
+    
+    
+    <aura:attribute name="globalStats" type="Object" default="{
+                                                                 'total': 0,
+                                                                 'clean': 0,
+                                                                 'missingCanonical': 0,
+                                                                 'duplicated': 0,
+                                                                 'empty': 0
+                                                                 }"/>
+
+
+    <!-- Tab 2 (Product Files) state -->
+    <aura:attribute name="fileSummary" type="Object"/>
+    <aura:attribute name="fileRows" type="Object[]"/>
+    <aura:attribute name="fileCols" type="List" default="[
+                                                         {'label':'Title','fieldName':'title','type':'text'},
+                                                         {
+                                                         label: 'Created',
+                                                         fieldName: 'contentDocumentCreatedDate',
+                                                         type: 'date',
+                                                         typeAttributes: {
+                                                         year: 'numeric',
+                                                         month: '2-digit',
+                                                         day: '2-digit',
+                                                         hour: '2-digit',
+                                                         minute: '2-digit',
+                                                         second: '2-digit',
+                                                         hour12: true
+                                                         }
+                                                         },
+
+        {'label':'ContentDocumentId','fieldName':'contentDocumentId','type':'text'},
+        {'label':'Latest ContentVersion','fieldName':'latestContentVersionId','type':'text'},
+        {'label':'Size (bytes)','fieldName':'contentSize','type':'number'},
+        {'label':'Last Modified','fieldName':'lastModifiedDate','type':'date','typeAttributes':{'year':'numeric','month':'2-digit','day':'2-digit','hour':'2-digit','minute':'2-digit'}},
+        {'label':'# Links','fieldName':'linkCount','type':'number'},
+        {'label':'Link Types','fieldName':'linkTypesSummary','type':'text'},
+        {'type':'action','typeAttributes':{'rowActions':[{'label':'View Links','name':'viewLinks'}]}}
+    ]"/>
+
+    <!-- Tab 2 (link viewer) state -->
+    <aura:attribute name="selectedDocId" type="Id"/>
+    <aura:attribute name="selectedDocTitle" type="String"/>
+    <aura:attribute name="docLinkRows" type="Object[]"/>
+    <aura:attribute name="docLinkCols" type="List" default="[
+        {'label':'Linked Entity Type','fieldName':'linkedEntityType','type':'text'},
+        {'label':'Linked Record','fieldName':'linkedEntityLabel','type':'text'},
+        {
+            'label':'Url',
+            'fieldName':'linkedEntityUrl',
+            'type':'url',
+            'typeAttributes':{'label':{'fieldName':'linkedEntityLabel'}, 'target':'_blank'}
+        },
+        {'label':'ShareType','fieldName':'shareType','type':'text'},
+        {'label':'Visibility','fieldName':'visibility','type':'text'},
+        {'label':'ContentDocumentLink Id','fieldName':'contentDocumentLinkId','type':'text'},
+        {
+            'label':'PDF',
+            'fieldName':'contentDocumentUrl',
+            'type':'url',
+            'typeAttributes':{'label':{'fieldName':'title'}, 'target':'_blank'}
+        }
+    ]"/>
+
+    <!-- TAB 3: Hash Audit state -->
+    <aura:attribute name="auditIsRunning" type="Boolean" default="false"/>
+    <aura:attribute name="auditResult" type="Object"/>
+    <aura:attribute name="auditRows" type="Object[]"/>
+    <aura:attribute name="auditCols" type="List" default="[
+        {'label':'Title','fieldName':'title','type':'text'},
+        {'label':'ContentDocumentId','fieldName':'contentDocumentId','type':'text'},
+        {'label':'Latest CV Id','fieldName':'latestContentVersionId','type':'text'},
+        {'label':'Size','fieldName':'contentSize','type':'number'},
+        {'label':'# Links','fieldName':'linkCount','type':'number'},
+        {'label':'Link Types','fieldName':'linkTypesSummary','type':'text'},
+        {'label':'SHA-256','fieldName':'existingSha256','type':'text'},
+        {'label':'Matches Incoming','fieldName':'matchesIncoming','type':'boolean'},
+        {'label':'Note','fieldName':'note','type':'text'}
+    ]"/>
+
+    <!-- TAB 4: Merge (read-only discovery) state -->
+    <aura:attribute name="mergeSummary" type="Object"/>
+    <aura:attribute name="mergeCandidates" type="Object[]"/>
+    <aura:attribute name="mergeIsLoading" type="Boolean" default="false"/>
+    <aura:attribute name="selectedCanonicalDocId" type="Id"/>
+
+    <!-- Merge-only status (Tab 4 uses this; avoid polluting global statusText) -->
+    <aura:attribute name="mergeStatusText" type="String" default=""/>
+
+    <aura:attribute name="mergeCols" type="List" default="[
+                                                          {'label':'Is Canonical','fieldName':'isCanonical','type':'boolean'},
+                                                          {'label':'Title','fieldName':'title','type':'text'},
+                                                          {
+                                                          label: 'Created',
+                                                          fieldName: 'contentDocumentCreatedDate',
+                                                          type: 'date',
+                                                          typeAttributes: {
+                                                          year: 'numeric',
+                                                          month: '2-digit',
+                                                          day: '2-digit',
+                                                          hour: '2-digit',
+                                                          minute: '2-digit'
+                                                          },
+                                                          sortable: true
+                                                          }
+                                                          ,
+                                                          {'label':'ContentDocumentId','fieldName':'contentDocumentId','type':'text'},
+        {'label':'Latest ContentVersion','fieldName':'latestContentVersionId','type':'text'},
+        {'label':'Size (bytes)','fieldName':'contentSize','type':'number'},
+        {'label':'Last Modified','fieldName':'lastModifiedDate','type':'date','typeAttributes':{'year':'numeric','month':'2-digit','day':'2-digit','hour':'2-digit','minute':'2-digit'}},
+        {'label':'# Links','fieldName':'linkCount','type':'number'},
+        {'label':'Link Types','fieldName':'linkTypesSummary','type':'text'},
+        {'label':'Hash Matches Incoming','fieldName':'hashMatchesIncoming','type':'boolean'},
+        {'type':'action','typeAttributes':{'rowActions':[{'label':'Select as Canonical','name':'selectCanonical'}]}}
+    ]"/>
+
+    <!-- Merge Plan (dry run) state -->
+    <aura:attribute name="mergePlan" type="Object"/>
+    <aura:attribute name="mergePlanRows" type="Object[]"/>
+    <aura:attribute name="mergePlanStatusText" type="String" default=""/>
+    <aura:attribute name="mergePlanIsLoading" type="Boolean" default="false"/>
+
+    <aura:attribute name="mergePlanCols" type="List" default="[
+                                                              {'label':'Duplicate Doc','fieldName':'sourceDocId','type':'text'},
+                                                              {'label':'Canonical Doc','fieldName':'canonicalDocId','type':'text'},
+                                                              {'label':'Linked Entity Type','fieldName':'linkedEntityType','type':'text'},
+                                                              {'label':'Linked Entity','fieldName':'linkedEntityLabel','type':'text'},
+                                                              {'label':'Linked Entity Id','fieldName':'linkedEntityId','type':'text'},
+                                                              {'label':'Will Insert','fieldName':'willInsert','type':'boolean'},
+                                                              {'label':'Will Delete','fieldName':'willDelete','type':'boolean'},
+                                                              
+                                                              {'label':'Already on Canonical',
+                                                              'fieldName':'canonicalAlreadyHasLink',
+                                                              'type':'boolean'},
+                                                              
+                                                              {'label':'Delete Breaks Coverage',
+                                                              'fieldName':'deleteNotOnCanonical',
+                                                              'type':'boolean'},
+                                                              
+                                                              {'label':'Covered After Merge',
+                                                              'fieldName':'representedOnCanonicalAfterPlan',
+                                                              'type':'boolean'},
+                                                              
+                                                              
+                                                              {'label':'Reason','fieldName':'reason','type':'text'}
+                                                              ]"/>
+    
+    <aura:attribute name="selectedInsertKeys" type="String[]"/>
+    <aura:attribute name="selectedDeleteLinkIds" type="String[]"/>
+
+    
+    <!-- STEP MODAL: link-level tables -->
+    <aura:attribute name="mergeCurrentInsertRows" type="Object[]"/>
+    <aura:attribute name="mergeCurrentDeleteRows" type="Object[]"/>
+    
+    <aura:attribute name="mergeSelectedInsertKeys" type="List" default="[]"/>
+    <aura:attribute name="mergeSelectedDeleteLinkIds" type="List" default="[]"/>
+    
+    <aura:attribute name="mergeStepDeletesCovered" type="Boolean" default="true"/>
+
+    
+    <!-- Columns (link-level) -->
+    <aura:attribute name="mergeInsertCols" type="List" default="[
+                                                                {'label':'Linked Entity','fieldName':'linkedEntityLabel','type':'text'},
+                                                                {'label':'Type','fieldName':'linkedEntityType','type':'text'},
+                                                                {'label':'Linked Entity Id','fieldName':'linkedEntityId','type':'text'},
+                                                                {'label':'ShareType','fieldName':'shareType','type':'text'},
+                                                                {'label':'Visibility','fieldName':'visibility','type':'text'},
+                                                                {'label':'Reason','fieldName':'reason','type':'text'}
+                                                                ]"/>
+    
+    <aura:attribute name="mergeDeleteCols" type="List" default="[
+                                                                {'label':'Linked Entity','fieldName':'linkedEntityLabel','type':'text'},
+                                                                {'label':'Already on Canonical','fieldName':'canonicalAlreadyHasLink','type':'boolean'},
+                                                                {'label':'Delete Breaks Coverage','fieldName':'deleteNotOnCanonical','type':'boolean'},
+                                                                {'label':'Covered After Merge','fieldName':'representedOnCanonicalAfterPlan','type':'boolean'},
+                                                                
+                                                                {'label':'Type','fieldName':'linkedEntityType','type':'text'},
+                                                                {'label':'Linked Entity Id','fieldName':'linkedEntityId','type':'text'},
+                                                                {'label':'ShareType','fieldName':'shareType','type':'text'},
+                                                                {'label':'Visibility','fieldName':'visibility','type':'text'},
+                                                                {'label':'Old CDL Id','fieldName':'contentDocumentLinkIdToDelete','type':'text'}
+                                                                ]"/>
+
+    <!-- Wizard / per-doc execution -->
+    <aura:attribute name="showMergeWizard" type="Boolean" default="false"/>
+    <aura:attribute name="mergeDuplicateDocs" type="Object[]"/>
+    <aura:attribute name="mergeStepIndex" type="Integer" default="0"/>
+    <aura:attribute name="mergeStepDoc" type="Object"/>
+    
+    <aura:attribute name="mergeStepInsertRows" type="Object[]"/>
+    <aura:attribute name="mergeStepDeleteRows" type="Object[]"/>
+    
+    <aura:attribute name="mergeStepSelectedInsertRows" type="Object[]"/>
+    <aura:attribute name="mergeStepSelectedDeleteRows" type="Object[]"/>
+    
+    <aura:attribute name="mergeStepDeleteDocChecked" type="Boolean" default="true"/>
+    
+    <aura:attribute name="mergeStepLocked" type="Boolean" default="false"/>
+
+    
+    <!-- Execution feedback -->
+    <aura:attribute name="mergeExecIsRunning" type="Boolean" default="false"/>
+    <aura:attribute name="mergeExecLog" type="String" default=""/>
+    <aura:attribute name="mergeStepResult" type="Object"/>
+    
+    <aura:attribute name="mergeExecStatusText" type="String" default=""/>
+	<aura:attribute name="mergeStepResultsByDocId" type="Object" default="{}"/>
+
+    
+    <aura:attribute name="cmp_Version" type="String" default="4.0"/> 
+    <aura:attribute name="cntrVersion" type="String" default="3.0"/>
+    <aura:attribute name="hlprVersion" type="String" default="6.0"/>
+    <aura:attribute name="apexVersion" type="String" default="4.0"/>
+    
+
+    <aura:handler name="init" value="{!this}" action="{!c.doInit}"/>
+
+    <lightning:card title="PDF Cleanup Console">
+        <div class="slds-p-around_small">
+            
+
+            <lightning:tabset selectedTabId="{!v.activeTabId}" onselect="{!c.onTabChange}" variant="scoped">
+
+                <!-- TAB 1: Compliance Dashboard -->
+                <lightning:tab label="Compliance Dashboard" id="dashboard">
+
+                    
+                    <!-- TAB 1 PANELS: Stats (left) + Activity (right) -->
+                    <div class="slds-m-top_small slds-grid slds-gutters slds-wrap">
+                        
+                        
+                        
+                        
+                        <!-- LEFT: Stats -->
+                        <div class="slds-col slds-size_1-of-1 slds-large-size_4-of-12">
+                            <div class="slds-box slds-theme_shade">
+                                <div class="slds-text-title_bold">Global Stats</div>
+                                
+                                <aura:if isTrue="{!v.globalStats != null}">
+                                    <div class="slds-m-top_x-small slds-text-body_small">
+                                        <div><b>Total Active:</b> {!v.globalStats.totalActive}</div>
+                                        <div><b>DUPLICATED:</b> {!v.globalStats.duplicated}</div>
+                                        <div><b>MISSING_CANONICAL:</b> {!v.globalStats.missingCanonical}</div>
+                                        <div><b>EMPTY:</b> {!v.globalStats.empty}</div>
+                                        <div><b>CLEAN:</b> {!v.globalStats.clean}</div>
+                                    </div>
+                                    <aura:set attribute="else">
+                                        <div class="slds-text-body_small slds-text-color_weak slds-m-top_x-small">
+                                            Loading…
+                                        </div>
+                                    </aura:set>
+                                </aura:if>
+                            </div>
+                        </div>
+                        
+                        <!-- RIGHT: Activity -->
+                        <div class="slds-col slds-size_1-of-1 slds-large-size_6-of-12">
+                            <div class="slds-box slds-theme_shade">
+                                <div class="slds-grid slds-grid_vertical-align-center slds-grid_align-spread">
+                                    <div class="slds-text-title_bold">Activity</div>
+                                    
+                                    <aura:if isTrue="{!v.isLoading}">
+                                        <div class="slds-grid slds-grid_vertical-align-center">
+                                            <lightning:spinner size="small"/>
+                                            <span class="slds-m-left_x-small slds-text-body_small slds-text-color_weak">Working…</span>
+                                        </div>
+                                    </aura:if>
+                                </div>
+                                
+                                <div class="slds-text-body_small slds-m-top_x-small">
+                                    <aura:if isTrue="{!not(empty(v.statusText))}">
+                                        {!v.statusText}
+                                        <aura:set attribute="else">
+                                            <span class="slds-text-color_weak">No actions yet.</span>
+                                        </aura:set>
+                                    </aura:if>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="slds-col slds-size_1-of-1 slds-large-size_2-of-12">
+                            <div>CMP v:{!v.cmp_Version}</div>
+                            <div>CNTRv:{!v.cntrVersion}</div>
+                            <div>HLPRv:{!v.hlprVersion}</div>
+                            <div>APEXv:{!v.apexVersion}</div>
+                        </div>
+                        
+                    </div>
+
+
+                    
+                    
+                    
+                    
+                    
+                    <!-- Search + filter row -->
+                    <div class="slds-grid slds-gutters slds-wrap">
+                        <div class="slds-col slds-size_1-of-1 slds-medium-size_4-of-12">
+                            <lightning:input label="Search (Name or ProductCode)" value="{!v.searchTerm}" />
+                        </div>
+
+                        <div class="slds-col slds-size_1-of-1 slds-medium-size_3-of-12">
+                            <lightning:select label="Filter" value="{!v.mode}">
+                                <option value="ALL">All</option>
+                                <option value="CLEAN">Clean</option>
+                                <option value="MISSING_CANONICAL">Missing Canonical</option>
+                                <option value="DUPLICATED">Duplicated</option>
+                                <option value="EMPTY">No Spec PDFs</option>
+                            </lightning:select>
+                        </div>
+
+                        <div class="slds-col slds-size_1-of-1 slds-medium-size_3-of-12 slds-m-top_large">
+                            <div class="slds-m-top_small slds-grid slds-grid_vertical-align-center slds-grid_align-end slds-gutters_x-small slds-nowrap">
+                                <div class="slds-col">
+                                    <lightning:button label="Run" variant="brand" onclick="{!c.runSearch}" disabled="{!v.isLoading}"/>
+                                </div>
+                                <div class="slds-col">
+                                    <lightning:button label="Reset" variant="destructive-text" onclick="{!c.resetSearch}" disabled="{!v.isLoading}"/>
+                                </div>
+                                <div class="slds-col">
+                                    <lightning:button label="Prev" variant="neutral" onclick="{!c.prevPage}" disabled="{!or(v.isLoading, v.pageNumber == 1)}"/>
+                                </div>
+                                <div class="slds-col slds-align_absolute-center">
+                                    <span class="slds-text-body_small slds-text-color_weak">
+                                        Page {!v.pageNumber} — Showing {!v.rangeLabel} of {!v.totalFound}
+                                    </span>
+                                    
+                                </div>
+                                <div class="slds-col">
+                                    <lightning:button label="Next" variant="neutral" onclick="{!c.nextPage}" disabled="{!or(v.isLoading, not(v.hasMore))}"/>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <aura:if isTrue="{!v.isLoading}">
+                        <lightning:spinner size="medium"/>
+                    </aura:if>
+                    
+                    
+
+
+                    
+                    <!-- TAB 1 STATUS  OOOOOLD 
+                    <aura:if isTrue="{!not(empty(v.statusText))}">
+                        <div class="slds-m-top_small slds-notify slds-notify_alert slds-theme_info" role="alert">
+                            <span class="slds-assistive-text">info</span>
+                            <div class="slds-truncate">{!v.statusText}</div>
+                        </div>
+                    </aura:if>-->
+
+                    <div class="slds-m-top_small">
+                        <lightning:datatable keyField="productId"
+                                             data="{!v.rows}"
+                                             columns="{!v.columns}"
+                                             onrowaction="{!c.onRowAction}"
+                                             hideCheckboxColumn="true"/>
+                    </div>
+
+                    <aura:if isTrue="{!not(empty(v.selectedProductId))}">
+                        <div class="slds-m-top_medium slds-box slds-theme_shade">
+                            <div><b>Selected Product:</b> {!v.selectedProductLabel}</div>
+                        </div>
+                    </aura:if>
+                </lightning:tab>
+
+                <!-- TAB 2 -->
+                <lightning:tab label="Product Files" id="files">
+
+                    <!-- <div class="slds-box slds-theme_warning slds-m-bottom_medium">
+                        <strong>Read-only (for now)</strong>
+                        <p>This tab only discovers linked spec PDFs. No changes happen here yet.</p>
+                    </div> -->
+                    
+                    <!-- TAB 2 ACTIVITY (always visible) -->
+                    <div class="slds-m-bottom_small slds-box slds-theme_shade">
+                        <div class="slds-grid slds-grid_vertical-align-center slds-grid_align-spread">
+                            <div class="slds-text-title_bold">Activity</div>
+                            
+                            <aura:if isTrue="{!v.isLoading}">
+                                <div class="slds-grid slds-grid_vertical-align-center">
+                                    <lightning:spinner size="small"/>
+                                    <span class="slds-m-left_x-small slds-text-body_small slds-text-color_weak">Working…</span>
+                                </div>
+                            </aura:if>
+                        </div>
+                        
+                        <div class="slds-text-body_small slds-m-top_x-small">
+                            <aura:if isTrue="{!not(empty(v.statusText))}">
+                                {!v.statusText}
+                                <aura:set attribute="else">
+                                    <span class="slds-text-color_weak">No actions yet.</span>
+                                </aura:set>
+                            </aura:if>
+                        </div>
+                    </div>
+ 
+
+                    <!-- TAB 2 STATUS OOOOOOLD 
+                    <aura:if isTrue="{!not(empty(v.statusText))}">
+                        <div class="slds-m-bottom_small slds-notify slds-notify_alert slds-theme_info" role="alert">
+                            <span class="slds-assistive-text">info</span>
+                            <div class="slds-truncate">{!v.statusText}</div>
+                        </div>
+                    </aura:if>-->
+
+                    <aura:if isTrue="{!empty(v.selectedProductId)}">
+                        <div class="slds-text-color_weak">
+                            Select a product in the Compliance Dashboard and click “Open Cleanup”.
+                        </div>
+                        <aura:set attribute="else">
+
+                            <div class="slds-m-bottom_small">
+                                <div><b>Product:</b> {!v.fileSummary.productCode} — {!v.fileSummary.productName}</div>
+                                <div><b>Canonical Doc:</b> {!v.fileSummary.canonicalDocId}</div>
+                                <div><b>Canonical Set At:</b> {!v.fileSummary.canonicalSetAt}</div>
+                            </div>
+
+                            <aura:if isTrue="{!v.isLoading}">
+                                <lightning:spinner size="medium"/>
+                            </aura:if>
+
+                            <lightning:datatable keyField="contentDocumentId"
+                                                 data="{!v.fileRows}"
+                                                 columns="{!v.fileCols}"
+                                                 onrowaction="{!c.onPdfRowAction}"
+                                                 hideCheckboxColumn="true"/>
+
+                            <aura:if isTrue="{!not(empty(v.selectedDocId))}">
+                                <div class="slds-m-top_medium slds-box slds-theme_shade">
+                                    <div class="slds-grid slds-grid_vertical-align-center slds-grid_align-spread">
+                                        <div>
+                                            <b>Links for:</b> {!v.selectedDocTitle}
+                                            <div class="slds-text-color_weak slds-text-body_small">{!v.selectedDocId}</div>
+                                        </div>
+                                        <div>
+                                            <lightning:button label="Close" variant="neutral" onclick="{!c.closeLinks}"/>
+                                        </div>
+                                    </div>
+
+                                    <aura:if isTrue="{!v.isLoading}">
+                                        <lightning:spinner size="small"/>
+                                    </aura:if>
+
+                                    <div class="slds-m-top_small">
+                                        <lightning:datatable keyField="contentDocumentLinkId"
+                                                             data="{!v.docLinkRows}"
+                                                             columns="{!v.docLinkCols}"
+                                                             hideCheckboxColumn="true"/>
+                                    </div>
+                                </div>
+                            </aura:if>
+
+                        </aura:set>
+                    </aura:if>
+                </lightning:tab>
+
+                <!-- TAB 3 -->
+                <lightning:tab label="Hash Audit" id="audit">
+
+                    <div class="slds-m-bottom_small">
+                        <div class="slds-text-body_small slds-text-color_weak">
+                            Runs a single callout for the selected product, computes SHA-256, and compares against every linked spec PDF.
+                        </div>
+                    </div>
+                    
+                    <!-- TAB 3 ACTIVITY (always visible) -->
+                    <div class="slds-m-bottom_small slds-box slds-theme_shade">
+                        <div class="slds-grid slds-grid_vertical-align-center slds-grid_align-spread">
+                            <div class="slds-text-title_bold">Activity</div>
+                            
+                            <aura:if isTrue="{!or(v.auditIsRunning, v.isLoading)}">
+                                <div class="slds-grid slds-grid_vertical-align-center">
+                                    <lightning:spinner size="small"/>
+                                    <span class="slds-m-left_x-small slds-text-body_small slds-text-color_weak">Working…</span>
+                                </div>
+                            </aura:if>
+                        </div>
+                        
+                        <div class="slds-text-body_small slds-m-top_x-small">
+                            <aura:if isTrue="{!not(empty(v.statusText))}">
+                                {!v.statusText}
+                                <aura:set attribute="else">
+                                    <span class="slds-text-color_weak">No actions yet.</span>
+                                </aura:set>
+                            </aura:if>
+                        </div>
+                    </div>
+
+
+                    <!-- TAB 3 STATUS OOOOOOOOLD 
+                    <aura:if isTrue="{!not(empty(v.statusText))}">
+                        <div class="slds-m-bottom_small slds-notify slds-notify_alert slds-theme_info" role="alert">
+                            <span class="slds-assistive-text">info</span>
+                            <div class="slds-truncate">{!v.statusText}</div>
+                        </div>
+                    </aura:if>-->
+
+                    <div class="slds-grid slds-grid_vertical-align-center slds-grid_align-spread slds-m-bottom_small">
+                        <div>
+                            <b>Selected Product:</b>
+                            <aura:if isTrue="{!not(empty(v.selectedProductLabel))}">
+                                {!v.selectedProductLabel}
+                                <aura:set attribute="else">(none)</aura:set>
+                            </aura:if>
+                        </div>
+
+                        <div>
+                            <lightning:button label="Run Hash Audit"
+                                              variant="brand"
+                                              onclick="{!c.runHashAudit}"
+                                              disabled="{!empty(v.selectedProductId) || v.auditIsRunning}"/>
+                        </div>
+                    </div>
+
+                    <aura:if isTrue="{!v.auditIsRunning}">
+                        <lightning:spinner size="medium"/>
+                    </aura:if>
+
+                    <aura:if isTrue="{!not(empty(v.auditResult))}">
+                        <div class="slds-box slds-theme_shade slds-m-bottom_small">
+                            <div><b>Incoming Size:</b> {!v.auditResult.incomingSize}</div>
+                            <div><b>Incoming SHA-256:</b> {!v.auditResult.incomingSha256}</div>
+                            <div class="slds-m-top_x-small"><b>Recommendation:</b> {!v.auditResult.recommendation}</div>
+                        </div>
+                    </aura:if>
+
+                    <div class="slds-m-top_small">
+                        <lightning:datatable keyField="contentDocumentId"
+                                             data="{!v.auditRows}"
+                                             columns="{!v.auditCols}"
+                                             hideCheckboxColumn="true"/>
+                    </div>
+                </lightning:tab>
+
+                <!-- TAB 4 -->
+                <lightning:tab label="Merge Preview / Execute" id="merge">
+
+                    <div class="slds-box slds-theme_warning slds-m-bottom_medium">
+                        <strong>Read-only (Discovery)</strong>
+                        <p>This step only shows what’s linked. No re-linking and no deletes yet.</p>
+                    </div>
+
+                    <aura:if isTrue="{!empty(v.selectedProductId)}">
+                        <div class="slds-text-color_weak">
+                            Select a product in the Compliance Dashboard first.
+                        </div>
+
+                        <aura:set attribute="else">
+
+                            <!-- Action bar -->
+                            <div class="slds-m-top_small slds-grid slds-grid_vertical-align-center slds-grid_align-spread slds-gutters_x-small">
+                                <div>
+                                    <b>Selected Product:</b> {!v.selectedProductLabel}
+                                </div>
+
+                                <div class="slds-grid slds-gutters_x-small slds-nowrap slds-grid_align-end">
+
+                                    <div class="slds-col">
+                                        <lightning:button label="Load Candidates"
+                                                          variant="brand"
+                                                          onclick="{!c.loadMergeCandidates}"
+                                                          disabled="{!v.mergeIsLoading}"/>
+                                    </div>
+
+                                    <div class="slds-col">
+                                        <lightning:button label="Refresh Hash"
+                                                          variant="neutral"
+                                                          onclick="{!c.refreshMergeHashes}"
+                                                          disabled="{!or(v.mergeIsLoading, v.auditIsRunning)}"/>
+                                    </div>
+
+                                    <div class="slds-col">
+                                        <lightning:button label="Build Merge Plan"
+                                                          variant="brand"
+                                                          onclick="{!c.buildMergePlan}"
+                                                          disabled="{!or(v.mergeIsLoading, v.mergePlanIsLoading, empty(v.selectedCanonicalDocId))}"/>
+                                    </div>
+                                    
+                                    <div class="slds-col">
+                                        <lightning:button
+                                                          label="Start Merge Wizard"
+                                                          variant="success"
+                                                          onclick="{!c.startMergeWizard}"
+                                                          disabled="{!or(
+                                                                    empty(v.mergePlan),
+                                                                    v.mergeDuplicateDocs.length == 0
+                                                                    )}"
+                                                          />
+                                    </div>
+
+                                </div>
+                            </div>
+                            
+                            <!-- TAB 4 ACTIVITY (always visible) -->
+                            <div class="slds-m-top_small slds-box slds-theme_shade">
+                                <div class="slds-grid slds-grid_vertical-align-center slds-grid_align-spread">
+                                    <div class="slds-text-title_bold">Activity</div>
+                                    
+                                    <aura:if isTrue="{!or(
+                                                     v.mergeIsLoading,
+                                                     v.mergePlanIsLoading,
+                                                     v.mergeExecIsRunning,
+                                                     v.auditIsRunning
+                                                     )}">
+                                        <div class="slds-grid slds-grid_vertical-align-center">
+                                            <lightning:spinner size="small"/>
+                                            <span class="slds-m-left_x-small slds-text-body_small slds-text-color_weak">Working…</span>
+                                        </div>
+                                    </aura:if>
+                                </div>
+                                
+                                <!-- “Last action” text (persist after completion) -->
+                                <div class="slds-text-body_small slds-m-top_x-small">
+                                    <aura:if isTrue="{!not(empty(v.mergeStatusText))}">
+                                        {!v.mergeStatusText}
+                                        <aura:set attribute="else">
+                                            <span class="slds-text-color_weak">No actions yet.</span>
+                                        </aura:set>
+                                    </aura:if>
+                                </div>
+                                
+                                <!-- Optional: secondary line for plan/build/exec details -->
+                                <aura:if isTrue="{!not(empty(v.mergePlanStatusText))}">
+                                    <div class="slds-text-body_small slds-text-color_weak slds-m-top_x-small">
+                                        {!v.mergePlanStatusText}
+                                    </div>
+                                </aura:if>
+                                
+                                <aura:if isTrue="{!not(empty(v.mergeExecStatusText))}">
+                                    <div class="slds-text-body_small slds-text-color_weak slds-m-top_x-small">
+                                        {!v.mergeExecStatusText}
+                                    </div>
+                                </aura:if>
+                            </div>
+
+
+                            <!-- TAB 4 STATUS (merge-only; never show global statusText here) -->
+                            <aura:if isTrue="{!not(empty(v.mergeStatusText))}">
+                                <div class="slds-m-top_small slds-notify slds-notify_alert slds-theme_info" role="alert">
+                                    <span class="slds-assistive-text">info</span>
+                                    <div class="slds-truncate">{!v.mergeStatusText}</div>
+                                </div>
+                            </aura:if>
+
+                            <aura:if isTrue="{!v.mergeIsLoading}">
+                                <lightning:spinner size="medium"/>
+                            </aura:if>
+
+                            <!-- Summary -->
+                            <aura:if isTrue="{!v.mergeSummary != null}">
+                                <div class="slds-box slds-theme_shade slds-m-top_small slds-m-bottom_small">
+                                    <div><b>Product:</b> {!v.mergeSummary.productCode} — {!v.mergeSummary.productName}</div>
+                                    <div><b>Canonical (field):</b> {!v.mergeSummary.canonicalDocId}</div>
+                                    <div><b>Canonical Set At:</b> {!v.mergeSummary.canonicalSetAt}</div>
+                                    <div class="slds-m-top_x-small"><b>Canonical (UI selection):</b> {!v.selectedCanonicalDocId}</div>
+                                </div>
+                            </aura:if>
+
+                            <!-- Merge Plan status -->
+                            <aura:if isTrue="{!not(empty(v.mergePlanStatusText))}">
+                                <div class="slds-m-top_x-small slds-text-color_weak">
+                                    {!v.mergePlanStatusText}
+                                </div>
+                            </aura:if>
+
+                            <aura:if isTrue="{!v.mergePlanIsLoading}">
+                                <lightning:spinner size="small"/>
+                            </aura:if>
+
+                            <!-- Merge Plan table (single source of truth: buildMergePlan) -->
+                            <aura:if isTrue="{!not(empty(v.mergePlanRows))}">
+                                <div class="slds-box slds-theme_shade slds-m-top_small slds-m-bottom_small">
+                                    <div class="slds-text-body_small slds-m-bottom_x-small">
+                                        <b>Merge Plan (Dry Run):</b>
+                                        {!v.mergePlan.totalRows} row(s) —
+                                        Inserts: {!v.mergePlan.insertCount},
+                                        Deletes: {!v.mergePlan.deleteCount},
+                                        Skipped inserts: {!v.mergePlan.skipInsertCount}
+                                    </div>
+                                    
+                                    <!-- INSERT LIST -->
+                                    <div class="slds-m-top_small slds-box slds-theme_shade">
+                                        <div class="slds-text-title_bold slds-m-bottom_x-small">
+                                            Links to INSERT on Canonical (check/uncheck)
+                                        </div>
+                                        
+                                        <lightning:datatable
+                                                             keyField="insertKey"
+                                                             data="{!v.mergeCurrentInsertRows}"
+                                                             columns="{!v.mergeInsertCols}"
+                                                             
+                                                             hideCheckboxColumn="true"/> 
+                                        <!-- selectedRows="{!v.selectedInsertKeys}"
+                                                             onrowselection="{!c.onInsertSelection}"
+-->
+                                    </div>
+                                    
+                                    <!-- DELETE LIST -->
+                                    <div class="slds-m-top_small slds-box slds-theme_shade">
+                                        <div class="slds-text-title_bold slds-m-bottom_x-small">
+                                            Links to DELETE from Duplicate (check/uncheck)
+                                        </div>
+                                        
+                                        <lightning:datatable
+                                                             keyField="contentDocumentLinkIdToDelete"
+                                                             data="{!v.mergeCurrentDeleteRows}"
+                                                             columns="{!v.mergeDeleteCols}"
+                                                             
+                                                             hideCheckboxColumn="true"/>
+                                        <!-- selectedRows="{!v.selectedDeleteLinkIds}"
+                                                             onrowselection="{!c.onDeleteSelection}" -->
+                                    </div>
+
+                                </div>
+                            </aura:if>
+
+                            <!-- Candidates -->
+                            <div class="slds-m-top_small">
+                                <lightning:datatable keyField="contentDocumentId"
+                                                     data="{!v.mergeCandidates}"
+                                                     columns="{!v.mergeCols}"
+                                                     onrowaction="{!c.onMergeRowAction}"
+                                                     hideCheckboxColumn="true"/>
+                            </div>
+
+                            <div class="slds-m-top_small slds-text-color_weak slds-text-body_small">
+                                • Hash column auto-fills if Tab 3 audit already ran<br/>
+                                • Otherwise click <b>Refresh Hash</b><br/>
+                                • Next phase: dry-run merge + execute
+                            </div>
+
+                        </aura:set>
+                    </aura:if>
+                    
+                    
+                    <aura:if isTrue="{!v.showMergeWizard}">
+                        <section role="dialog" tabindex="-1" aria-modal="true"
+                                 class="slds-modal slds-fade-in-open slds-modal_large">
+                            <div class="slds-modal__container">
+                                
+                                <header class="slds-modal__header">
+                                    <lightning:buttonIcon iconName="utility:close"
+                                                          class="slds-modal__close"
+                                                          onclick="{!c.closeMergeWizard}"
+                                                          alternativeText="Close"/>
+                                    <h2 class="slds-text-heading_medium">
+                                        Merge / Delete — File {!v.mergeStepIndex + 1} of {!v.mergeDuplicateDocs.length}
+                                    </h2>
+                                </header>
+                                
+                                <div class="slds-modal__content slds-p-around_medium">
+                                    
+                                    <!--<aura:if isTrue="{!not(empty(v.mergeExecStatusText))}"> -->
+                                        <div class="slds-m-bottom_small slds-notify slds-notify_alert slds-theme_info" role="alert">
+                                            <span class="slds-assistive-text">info</span>
+                                            <div class="slds-truncate">MERGE STATUS: {!v.mergeExecStatusText}</div>
+                                        </div>
+                                    <!-- </aura:if> -->
+
+                                    
+                                    <!-- Current duplicate doc summary -->
+                                    <aura:if isTrue="{!v.mergeStepDoc != null}">
+                                        <div class="slds-box slds-theme_shade slds-m-bottom_small">
+                                            <div class="slds-text-title_bold">
+                                                Duplicate ContentDocument (candidate)
+                                            </div>
+                                            
+                                            <!-- <div>
+                                                <b>{!v.mergeStepDoc.title}</b>
+                                            </div>-->
+                                            
+                                            <lightning:formattedUrl
+                                                                    value="{!'/lightning/r/ContentDocument/' + v.mergeStepDoc.duplicateDocId + '/view'}"
+                                                                    label="{!v.mergeStepDoc.title}"
+                                                                    target="_blank"
+                                                                    />
+                                            
+                                            <div class="slds-text-body_small slds-text-color_weak">
+                                                {!v.mergeStepDoc.duplicateDocId}
+                                            </div>
+                                            
+                                            <div class="slds-m-top_x-small">
+                                                <b>Eligible for delete:</b> {!v.mergeStepDoc.eligibleForDelete}
+                                                <span class="slds-m-left_small slds-text-color_weak">
+                                                    {!v.mergeStepDoc.eligibilityReason}
+                                                </span>
+                                            </div>
+                                            
+                                            <div class="slds-m-top_x-small">
+                                                <b>Planned:</b>
+                                                Inserts {!v.mergeStepDoc.plannedInserts},
+                                                Deletes {!v.mergeStepDoc.plannedDeletes},
+                                                Total links {!v.mergeStepDoc.totalLinks}
+                                            </div>
+                                        </div>
+                                    </aura:if>
+                                    
+                                    <!-- Canonical target summary -->
+                                    <div class="slds-box slds-theme_info slds-m-bottom_small">
+                                        <div class="slds-text-title_bold">Canonical target</div>
+                                        <div>
+                                            <b>ProductCode ... {!v.mergeSummary.productCode}</b> --- (Product Name) ... {!v.mergeSummary.productName}
+                                        </div>
+                                        <div class="slds-text-body_small slds-text-color_weak">
+                                            Canonical ContentDocumentId: {!v.selectedCanonicalDocId}
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Delete doc checkbox -->
+                                    <div class="slds-m-bottom_small">
+                                        <lightning:input type="checkbox"
+                                                         label="Delete this duplicate ContentDocument after links are moved"
+                                                         checked="{!v.mergeStepDeleteDocChecked}"
+                                                         disabled="{!or(v.mergeExecIsRunning, v.mergeStepLocked, not(v.mergeStepDoc.eligibleForDelete))}"
+                                                         />
+                                                         <!--
+                                                         disabled="{!or(v.mergeExecIsRunning, not(v.mergeStepDoc.eligibleForDelete))}"
+                                                         />-->
+                                        
+                                        <aura:if isTrue="{!not(v.mergeStepDoc.eligibleForDelete)}">
+                                            <div class="slds-text-color_error slds-text-body_small">
+                                                This doc is not eligible for delete by rule; checkbox is forced off.
+                                            </div>
+                                        </aura:if>
+                                    </div>
+                                    
+                                    <div class="slds-m-bottom_small slds-grid slds-grid_vertical-align-center">
+                                        <aura:if isTrue="{!v.mergeStepDeletesCovered}">
+                                            <lightning:icon iconName="utility:success" size="small" class="slds-icon-text-success"/>
+                                            <span class="slds-m-left_x-small slds-text-color_success">
+                                                Covered after merge (safe to delete planned links).
+                                            </span>
+                                            <aura:set attribute="else">
+                                                <lightning:icon iconName="utility:error" size="small" class="slds-icon-text-error"/>
+                                                <span class="slds-m-left_x-small slds-text-color_error">
+                                                    NOT covered: at least one planned delete would remove a link that won’t exist on Canonical after merge.
+                                                </span>
+                                            </aura:set>
+                                        </aura:if>
+                                    </div>
+
+                                    
+                                    <!-- INSERT LIST (for this duplicate doc only) -->
+                                    <div class="slds-box slds-theme_shade slds-m-bottom_small">
+                                        <div class="slds-text-title_bold slds-m-bottom_x-small">
+                                            Links to INSERT on Canonical (check/uncheck)
+                                        </div>
+                                        
+                                        <lightning:datatable keyField="insertKey"
+                                                             data="{!v.mergeStepInsertRows}"
+                                                             columns="{!v.mergeInsertCols}"
+                                                             onrowselection="{!c.onStepInsertSelection}"
+                                                             hideCheckboxColumn="{!or(v.mergeExecIsRunning, v.mergeStepLocked)}"
+/>
+                                    </div>
+                                    
+                                    <!-- DELETE LIST (for this duplicate doc only) -->
+                                    <div class="slds-box slds-theme_shade">
+                                        <div class="slds-text-title_bold slds-m-bottom_x-small">
+                                            Links to DELETE from Duplicate (check/uncheck)
+                                        </div>
+                                        
+                                        <lightning:datatable keyField="contentDocumentLinkIdToDelete"
+                                                             data="{!v.mergeStepDeleteRows}"
+                                                             columns="{!v.mergeDeleteCols}"
+                                                             onrowselection="{!c.onStepDeleteSelection}"
+                                                             hideCheckboxColumn="{!or(v.mergeExecIsRunning, v.mergeStepLocked)}"
+/>
+                                    </div>
+                                    
+                                    <!-- Execution log / result -->
+                                    <aura:if isTrue="{!not(empty(v.mergeExecLog))}">
+                                        <div class="slds-m-top_small slds-box slds-theme_default">
+                                            <div class="slds-text-title_bold">Execution Log</div>
+                                            <pre style="white-space:pre-wrap">{!v.mergeExecLog}</pre>
+                                        </div>
+                                    </aura:if>
+                                    
+                                </div>
+                                
+                                <footer class="slds-modal__footer">
+                                    <div class="slds-grid slds-grid_align-spread slds-grid_vertical-align-center">
+                                        
+                                        <lightning:button label="Prev"
+                                                          onclick="{!c.prevMergeStep}"
+                                                          disabled="{!or(v.mergeExecIsRunning, v.mergeStepIndex == 0)}"/>
+                                        
+                                        <lightning:button label="Next"
+                                                          onclick="{!c.nextMergeStep}"
+                                                          disabled="{!or(v.mergeExecIsRunning, v.mergeStepIndex == v.mergeDuplicateDocs.length-1)}"/>
+                                        
+                                        <!--
+                                        <div class="slds-grid slds-gutters_x-small">
+                                            <lightning:button label="Prev"
+                                                              onclick="{!c.prevMergeStep}"
+                                                              disabled="{!or(v.mergeExecIsRunning, v.mergeStepLocked, v.mergeStepIndex == 0)}"   />
+                                            <lightning:button label="Next"
+                                                              onclick="{!c.nextMergeStep}"
+                                                              disabled="{!or(v.mergeExecIsRunning, v.mergeStepLocked, v.mergeStepIndex == v.mergeDuplicateDocs.length-1)}"/>
+                                        </div>
+                                        -->
+                                        
+                                        <div class="slds-grid slds-gutters_x-small">
+                                            
+                                            <!-- DRY RUN -->
+                                            <lightning:button
+                                                              label="Dry Run (Rollback)"
+                                                              variant="neutral"
+                                                              onclick="{!c.executeMergeRollback}"
+                                                              disabled="{!or(v.mergeExecIsRunning, v.mergeStepLocked)}"
+
+                                                              />
+                                            
+                                            <!-- REAL EXECUTION 
+                                            <lightning:button
+                                                              label="EXECUTE (REAL DELETE)"
+                                                              variant="destructive"
+                                                              onclick="{!c.executeMergeReal}"
+                                                              disabled="{!v.mergeExecIsRunning}"
+                                                              />
+                                            -->
+                                            
+                                            <lightning:button label="Execute Merge (For Real)"
+                                                              variant="brand"
+                                                              onclick="{!c.onExecuteForReal}" 
+                                                              disabled="{!or(v.mergeExecIsRunning, v.mergeStepLocked)}"
+
+                                                              />
+                                            
+                                            <!-- CLOSE -->
+                                            <lightning:button
+                                                              label="Close"
+                                                              variant="neutral"
+                                                              onclick="{!c.closeMergeWizard}"
+                                                              disabled="{!v.mergeExecIsRunning}"
+                                                              />
+                                        </div>
+
+                                    </div>
+                                    
+                                    <aura:if isTrue="{!v.mergeExecIsRunning}">
+                                        <div class="slds-m-top_small">
+                                            <lightning:spinner size="small"/>
+                                        </div>
+                                    </aura:if>
+                                </footer>
+                                
+                            </div>
+                        </section>
+                        <div class="slds-backdrop slds-backdrop_open"></div>
+                    </aura:if>
+
+                    
+                    
+                    
+                    
+                </lightning:tab>
+
+            </lightning:tabset>
+        </div>
+    </lightning:card>
+</aura:component>
