@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<LightningComponentBundle xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>58.0</apiVersion>
+    <isExposed>true</isExposed>
+    <masterLabel>BB_EventsTeamDisplay</masterLabel>
+    <description>Component recognizes the current user and finds relevant Event and Task Listview Rows for Display</description>
+    <targets>
+        <target>lightning__HomePage</target>
+    </targets>
+    <targetConfigs>
+        <targetConfig targets="lightning__HomePage">
+            <property name="valueDisplayType" type="String" label="DisplayType" default="utility:table"/>
+            <property name="defaultChoice" type="String" label="Listview Choice[Label]" default="My Recent Events"/>
+        </targetConfig>
+    </targetConfigs>
+</LightningComponentBundle>

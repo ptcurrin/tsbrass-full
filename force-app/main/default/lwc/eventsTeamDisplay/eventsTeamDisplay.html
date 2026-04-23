@@ -1,0 +1,429 @@
+<template>
+
+    <template lwc:if={hasPermission}>
+
+
+        <lightning-card>
+
+
+
+            <template lwc:if={isKanban}>
+
+                <h3 slot="title">
+                    <lightning-icon icon-name="standard:event" size="small"></lightning-icon>
+                    &nbsp;Today's Events &amp; More
+                </h3>
+
+
+                <lightning-button-menu alternative-text="Show menu" variant="border-filled" icon-name={valueDisplayType}
+                    slot="actions" onselect={handleChangeDisplayType}>
+                    <template for:item="menuvalue" for:each={optionsDisplayType}>
+                        <lightning-menu-item label={menuvalue.label} value={menuvalue.value} key={menuvalue.value}>
+                        </lightning-menu-item>
+                    </template>
+                </lightning-button-menu>
+
+                <p class="slds-p-horizontal_small">
+
+                    <span>
+                        <lightning-combobox variant="label-hidden" name="progress" label="ListViews" value={listViewId}
+                            placeholder="Select ListView Data" options={listViewsDisplayed}
+                            onchange={handleChangeListViewId}>
+                        </lightning-combobox>
+                    </span>
+
+                </p>
+
+            </template>
+            <template lwc:elseif={isTable}>
+
+
+                <div class="slds-grid" slot="title">
+
+                    <div class="slds-media slds-no-space slds-grow">
+
+                        <div class="highlights-icon-container slds-avatar slds-m-right_small icon"
+                            style="background-color: #9602C7">
+
+                            <lightning-icon icon-name="standard:event" size="medium"></lightning-icon>
+
+                        </div>
+
+                        <div class="slds-media__body slds-align-middle">
+
+                            <div class="slds-breadcrumb slds-list_horizontal slds-wrap">
+                                <div class="slds-breadcrumb__item slds-line-height--reset">
+                                    <span class="slds-var-p-right_x-small" style="font-weight:normal">
+                                        Events</span>
+                                </div>
+                            </div>
+
+                            <h2
+                                class="slds-page-header__title listViewTitle slds-text-color--default slds-p-right--x-small slds-truncate">
+                                <a href={listViewAddress} title="My Events" style="color:black">{listViewName}</a>
+                            </h2>
+                        </div>
+                    </div>
+
+                </div>
+
+
+
+                <p class="slds-p-horizontal_small">
+                    <lightning-combobox variant="label-hidden" name="progress" label="ListViews" value={listViewId}
+                        placeholder="Select ListView Data" options={listViewsDisplayed}
+                        onchange={handleChangeListViewId}>
+                    </lightning-combobox>
+                </p>
+
+                <lightning-button-menu alternative-text="Show menu" variant="border-filled" icon-name={valueDisplayType}
+                    slot="actions" onselect={handleChangeDisplayType}>
+                    <template for:item="menuvalue" for:each={optionsDisplayType}>
+                        <lightning-menu-item label={menuvalue.label} value={menuvalue.value} key={menuvalue.value}>
+                        </lightning-menu-item>
+                    </template>
+                </lightning-button-menu>
+
+
+            </template>
+
+            <!--<p class="slds-p-horizontal_small">Selected value is: {listViewId}</p>-->
+
+            <!-- <lightning-button label="New" slot="actions"></lightning-button> -->
+
+            <template lwc:if={isLoaded}>
+            </template>
+            <template lwc:elseclass="slds-is-relative">
+                <lightning-spinner alternative-text="Loading...">
+                </lightning-spinner>
+            </template>
+
+
+            <template lwc:if={isTable}>
+
+
+                <div class="light uiAbstractList forceFilterList" style="background-color:#ededed">
+
+                    <div class="listTitleContainer uiBlock" style="padding:12px;margin:12px;background-color:#ededed">
+                        <!--<div class="bLeft">
+                        <div style="background-color: #CB65FF" class="large forceEntityIcon">
+                            <span class="uiImage">
+                                <lightning-icon icon-name="standard:event" size="large"> </lightning-icon>
+                            </span>
+                        </div>
+                    </div>
+                -->
+                        <div class="bBody">
+                            <a class="slds-grid triggerLink">
+                                <span class="assistiveText">List Views</span>
+                                <h2 class="slds-grow listTitle truncate">
+
+
+                                    <span class="countAndSortLabel filterIndicator">
+                                        {numFoundEvents} items<!--, sorted by Start
+                                Date &amp;
+                                Time--></span>
+
+                                </h2>
+                                <!--render facet: 59:870;a-->
+                            </a>
+                        </div>
+
+
+
+                    </div>
+                </div>
+
+
+                <p style="margin-bottom:8px"></p>
+
+                <template lwc:if={isLoaded}>
+
+                    <p class="slds-p-horizontal_small"></p>
+                    <template if:true={listViewId}>
+
+                        <lightning-datatable key-field="Id" data={events} columns={columns}>
+
+                        </lightning-datatable>
+
+                    </template>
+                </template>
+
+            </template>
+
+
+
+            <template lwc:elseif={isKanban}>
+
+                <template lwc:if={isLoaded}>
+
+                    <template if:true={listViewId}>
+
+
+
+                        <div class="light uiAbstractList forceFilterList">
+
+                            <div class="listTitleContainer uiBlock"
+                                style="padding:12px;margin:12px;background-color:#ededed">
+                                <div class="bLeft">
+                                    <div style="background-color: #CB65FF" class="large forceEntityIcon">
+                                        <span class="uiImage">
+                                            <lightning-icon icon-name="standard:event" size="large"> </lightning-icon>
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div class="bBody">
+                                    <a class="slds-grid triggerLink">
+                                        <span class="assistiveText">List Views Total Items {numFoundEvents}</span>
+                                        <h2 class="slds-grow listTitle truncate">
+                                            <span class="titleWrapper">
+                                                <h2>
+                                                    {listViewName}
+                                                </h2>
+                                            </span>
+
+                                            <span class="countAndSortLabel filterIndicator">
+                                                &nbsp;{numFoundEvents} items</span>
+                                            <span class="filterLabel filterIndicator" data-aura-rendered-by="57:870;a">
+                                                ...
+                                            </span>
+                                        </h2>
+
+                                    </a>
+                                </div>
+
+
+
+                            </div>
+                        </div>
+                    </template>
+
+
+
+                    <p class="slds-p-horizontal_small">
+
+                        <template lwc:if={events}>
+                            <template for:each={events} for:item="evt">
+
+
+                                <div key={evt.Id} style="border-bottom:1px gray thin">
+
+
+                                    <ul>
+                                        <li
+                                            class="light  actionable uiInfiniteListRow forceActionRow forceListRecord forceRecordLayout uiInfiniteListRow forceActionRow forceListRecord forceRecordLayout">
+                                            <div class="body">
+                                                <a class="listItem" href={evt.orgUrlPlusId}>
+                                                    <h3 class="itemTitle">
+
+                                                        <template if:true={evt.IsAllDayEvent}>
+                                                            <lightning-formatted-date-time
+                                                                value={evt.ActivityDate}></lightning-formatted-date-time>
+                                                        </template>
+
+                                                        <template if:false={evt.IsAllDayEvent}>
+                                                            <lightning-formatted-date-time year="numeric"
+                                                                month="numeric" day="numeric" hour="2-digit"
+                                                                time-zone-name="short" minute="2-digit"
+                                                                value={evt.StartDateTime}></lightning-formatted-date-time>
+                                                        </template>
+
+
+                                                        <!--{evt.StartDateTime}-->
+                                                    </h3>
+                                                    <ul class="itemRows truncate">
+                                                        <li class="tableRowGroup">
+                                                            <div class="slds-list--horizontal forceListRecordItem">
+                                                                <div title="End Date &amp; Time:"
+                                                                    class="slds-item--label slds-truncate recordCell">
+
+
+
+                                                                    <template if:true={evt.IsAllDayEvent}>
+                                                                        End Date
+                                                                        &amp;
+                                                                        Time:
+                                                                    </template>
+
+                                                                    <template if:false={evt.IsAllDayEvent}>
+                                                                        End Date:
+                                                                    </template>
+
+
+                                                                </div>
+
+                                                                <div class="slds-item--detail slds-truncate recordCell">
+                                                                    <span class="uiOutputDateTime"
+                                                                        data-aura-class="uiOutputDateTime">
+
+                                                                        <template if:true={evt.IsAllDayEvent}>
+                                                                            <lightning-formatted-date-time
+                                                                                value={evt.StartDateTime}></lightning-formatted-date-time>
+                                                                        </template>
+
+                                                                        <template if:false={evt.IsAllDayEvent}>
+                                                                            <lightning-formatted-date-time
+                                                                                year="numeric" month="numeric"
+                                                                                day="numeric" hour="2-digit"
+                                                                                time-zone-name="short" minute="2-digit"
+                                                                                value={evt.StartDateTime}></lightning-formatted-date-time>
+                                                                        </template>
+
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        </li>
+                                                        <li class="tableRowGroup">
+                                                            <div class="slds-list--horizontal forceListRecordItem">
+                                                                <div title="Subject"
+                                                                    class="slds-item--label slds-truncate recordCell">
+                                                                    Subject:
+                                                                </div>
+
+                                                                <div class="slds-item--detail slds-truncate recordCell"
+                                                                    data-aura-rendered-by="2067:0">
+                                                                    <span class="uiOutputText">
+                                                                        <lightning-formatted-text
+                                                                            value={evt.Subject}></lightning-formatted-text>
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        </li>
+
+                                                        <li class="tableRowGroup">
+                                                            <div class="slds-list--horizontal forceListRecordItem">
+                                                                <div title="Name"
+                                                                    class="slds-item--label slds-truncate recordCell">
+                                                                    Name:</div>
+
+                                                                <div class="slds-item--detail slds-truncate recordCell"
+                                                                    data-aura-rendered-by="2067:0">
+
+                                                                    <span class="uiOutputText">
+                                                                        <template if:true={evt.Who}>
+                                                                            <lightning-formatted-text
+                                                                                value={evt.Who.Name}></lightning-formatted-text>
+                                                                        </template>
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        </li>
+
+                                                        <li class="tableRowGroup">
+                                                            <div class="slds-list--horizontal forceListRecordItem">
+                                                                <div title="Related To &amp; Time:"
+                                                                    class="slds-item--label slds-truncate recordCell">
+                                                                    Related
+                                                                    To:
+                                                                </div>
+
+                                                                <div class="slds-item--detail slds-truncate recordCell"
+                                                                    data-aura-rendered-by="2067:0">
+                                                                    <span class="uiOutputText">
+                                                                        <template if:true={evt.What}>
+                                                                            <lightning-formatted-text
+                                                                                value={evt.What.Name}></lightning-formatted-text>
+                                                                        </template>
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        </li>
+
+                                                        <li class="tableRowGroup">
+                                                            <div class="slds-list--horizontal forceListRecordItem">
+                                                                <div title="User Alias"
+                                                                    class="slds-item--label slds-truncate recordCell">
+                                                                    Assigned
+                                                                    Alias:
+                                                                </div>
+
+                                                                <div class="slds-item--detail slds-truncate recordCell"
+                                                                    data-aura-rendered-by="2067:0">
+                                                                    <span class="uiOutputText">
+                                                                        <template if:true={evt.Owner}>
+                                                                            <lightning-formatted-text
+                                                                                value={evt.Owner.Alias}></lightning-formatted-text>
+                                                                        </template>
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        </li>
+
+                                                        <li class="tableRowGroup">
+                                                            <div class="slds-list--horizontal forceListRecordItem">
+                                                                <div title="User Alias"
+                                                                    class="slds-item--label slds-truncate recordCell">
+                                                                    All-day:
+                                                                </div>
+
+                                                                <div class="slds-item--detail slds-truncate recordCell">
+                                                                    <span class="uiImage uiOutputCheckbox">
+
+                                                                        <template if:true={evt.IsAllDayEvent}>
+                                                                            <img src="/auraFW/resources/aura/s.gif"
+                                                                                class=" checked" alt="True">
+                                                                        </template>
+
+                                                                        <template if:false={evt.IsAllDayEvent}>
+                                                                            <img src="/auraFW/resources/aura/s.gif"
+                                                                                class=" unchecked" alt="False">
+                                                                        </template>
+
+
+
+
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        </li>
+
+                                                    </ul>
+
+                                                </a>
+                                            </div>
+                                        </li>
+                                    </ul>
+
+
+
+
+                                </div>
+
+
+                            </template>
+                        </template>
+
+
+
+                    </p>
+                </template>
+
+            </template>
+
+            <template lwc:else>
+                There was a problem loading the Display Type
+            </template>
+
+
+
+            <template lwc:if={isKanban}>
+                <template lwc:if={listViewAddress}>
+
+                    <p slot="footer">
+                        <a href={listViewAddress}>
+
+                            <lightning-formatted-text value="Go To List">
+
+                            </lightning-formatted-text>
+                        </a>
+                    </p>
+
+                </template>
+            </template>
+        </lightning-card>
+
+    </template>
+
+
+</template>

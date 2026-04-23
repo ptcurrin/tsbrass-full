@@ -1,0 +1,43 @@
+.uiBlock,.uiBlock .bBody {
+    overflow: hidden;
+    vertical-align: top
+}
+
+.uiBlock .bLeft {
+    float: left
+}
+
+.uiBlock .bLeft img {
+    display: block
+}
+
+.uiBlock .bRight {
+    float: right
+}
+
+.uiBlock.overflow>.bBody {
+    display: table-cell;
+    vertical-align: top;
+    width: 10000px
+}
+
+.uiBlock.overflow,.uiBlock.overflow>.bBody {
+    overflow: visible
+}
+
+.uiBlock.overflow:before,.uiBlock.overflow:after {
+    content: "";
+    display: table
+}
+
+.uiBlock.overflow:after {
+    clear: both
+}
+
+.uiBlock.overflow>.bLeft {
+    float: left
+}
+
+.uiBlock.overflow>.bRight {
+    float: right
+}
