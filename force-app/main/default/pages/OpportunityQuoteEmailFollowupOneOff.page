@@ -1,0 +1,58 @@
+<apex:page standardController="Opportunity" extensions="OpportunityQuoteEmailFollow_VFPage_Conn">
+    
+    <apex:form >
+        
+        <apex:pageBlock title="Follow-Up Send Now">
+            
+            <apex:pageBlockSection title="Opp">
+                
+                <apex:outputField value="{!opp_Found.Name}"/>
+                
+            </apex:pageBlockSection>
+            
+            <apex:pageBlockSection title="Current Timing">
+                <apex:outputField value="{!opp_Found.Quote_Email_Followup_Interval_Days__c }"/>
+                <apex:outputField value="{!opp_Found.Quote_Email_Last_Recorded_Followup_Date__c }"/>
+                <apex:outputField value="{!opp_Found.Quote_Email_Next_Followup_Date__c  }"/>
+                
+            </apex:pageBlockSection>
+            
+            <apex:pageBlockSection title="Recipients"  columns="1">
+            	<apex:outputText label="Addresses" value="{!stringAddresses}"></apex:outputText>
+                <apex:outputText label="CC" value="{!stringCCs}"></apex:outputText>
+            </apex:pageBlockSection>
+            
+            <apex:pageBlockSection >
+            	<apex:outputText label="replyTo" value="{!replyTo}"></apex:outputText>
+                <apex:outputText label="senderDisplayName" value="{!senderDisplayName}"></apex:outputText>
+            </apex:pageBlockSection>
+            
+            <apex:pageBlockSection title="Content" columns="1">
+                
+                <!--<apex:outputField value="{!opp_Found.Quote_Email_Standard_Followup_Subject__c   }"/>-->
+                <apex:outputText value="{!stringSubject}"></apex:outputText>
+                <!--<apex:outputField value="{!opp_Found.Quote_Email_Standard_Followup_Blurb__c    }"/>-->
+                <apex:outputText escape="false" value="{!stringBody}"></apex:outputText>
+                <apex:outputField value="{!opp_Found.Salesperson__c}"/>
+                
+                <apex:outputText value="{!signature}"></apex:outputText>
+            
+            </apex:pageBlockSection>
+            <!--
+            stringBody {get;set;}
+    public string stringSubject {get;set;}
+    public string stringAddresses {get;set;}
+    public string stringCCs {get;set;}
+    public string signature
+            -->
+            <apex:pageBlockSection >
+                
+            	<apex:commandButton style="margin-left:40%" disabled="{oppFoundNull}" value="Send Followup" action="{!send}" />
+                
+            </apex:pageBlockSection>
+            
+        </apex:pageBlock>
+        
+    </apex:form>
+    
+</apex:page>

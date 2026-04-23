@@ -7,20 +7,20 @@
     <types>
         <members>*</members>
         <name>ApexComponent</name>
-    </types>
+    </types>-->
     <types>
         <members>*</members>
         <name>ApexPage</name>
     </types>
-    <types>
+    <!--<types>
         <members>*</members>
         <name>ApexTestSuite</name>
-    </types>-->
+    </types>
     <types>
         <members>*</members>
         <name>ApexTrigger</name>
     </types>
-    <!--<types>
+    <types>
         <members>*</members>
         <name>AuraDefinitionBundle</name>
     </types>

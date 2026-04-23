@@ -1,0 +1,5 @@
+<apex:page standardController="Product2" extensions="ProductPDFGet_RedirectClass" action="{!redirect}">
+
+    
+    
+</apex:page>

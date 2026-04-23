@@ -1,0 +1,263 @@
+<apex:page standardController="Opportunity" extensions="OpportunityQuoteEmail_VFPage_Controller">
+    
+    <style type="text/css">
+        img:-moz-broken{
+        opacity: 0;
+        }
+        
+        .form_elem{
+        height: 24px;
+        font-size: 22px;
+        }
+        
+    </style>
+    
+    <apex:form ></apex:form>
+    
+    <apex:messages />
+    
+    
+    <apex:pageBlock html-style="width:80%"  rendered="{!developmentWarningBool}" title="Development Warning Block">
+        <apex:outputText style="color:red" value="{!developmentWarningString}" >
+            
+        </apex:outputText>
+    </apex:pageBlock>
+    
+    <apex:pageBlock html-style="width:80%"  rendered="{!renderWarningBool}" title="Error Warning Block">
+        <apex:outputText style="color:red" value="{!renderWarningString}" >
+            
+        </apex:outputText>
+    </apex:pageBlock>
+    
+    
+    <apex:form title="Send Quote Email">
+        
+        <apex:pageBlock html-style="width:80%"  title="{!opp.Name}" rendered="{!renderUsefulPage}">
+            
+            <!--<c:DragDrop parentId="{!$CurrentPage.parameters.id}" DragDropHeight="100px" />-->
+            
+            
+             
+            <apex:outputLabel style="font-weight: bold;"># of Quote Objects found, with latest-PDF >>> &nbsp; </apex:outputLabel>(&nbsp;<apex:outputText label="Number of Quote Objects with PDF to send: " value="{!numQuotesWithPDFS}"></apex:outputText> )
+            
+            <br/>
+            <br/>
+            <apex:dataTable value="{!map_QuoteId_ContentVersion}" var="qkey" id="theTable"
+                            rowClasses="odd,even" >
+                <!--<apex:facet name="caption">Quote PDFs Attached</apex:facet>-->
+                <!--<apex:facet name="header">Quote Files Being Sent</apex:facet>-->
+                <!--<apex:facet name="footer">end</apex:facet>-->
+                
+                <apex:column style="padding-left:12px;padding-right:18px">
+                    <apex:facet name="header">Quote Name</apex:facet>
+                    <!--<apex:facet name="footer">column footer</apex:facet>-->
+                    <apex:outputText value="{!mapQuotes[qkey].Name}"/>
+                </apex:column>
+                
+                <apex:column >
+                    <apex:facet name="header">PDF Title</apex:facet>
+                    <!--<apex:facet name="footer">column footer</apex:facet>-->
+                    <apex:outputText value="{!map_QuoteId_ContentVersion[qkey].Title}[.pdf]"/>
+                </apex:column>
+                
+            </apex:dataTable>
+            
+            <!--
+<apex:variable var="rowVal" value="{!0}"/>
+<ul>
+
+<apex:repeat value="{!map_QuoteId_ContentVersion}" var="qkey" >
+
+<apex:variable var="rowVal" value="{!rowVal + 1}"/>
+<li>
+{!rowVal} .) &nbsp;{!mapQuotes[qkey].Name}  {!map_QuoteId_ContentVersion[qkey].Title}[.pdf]
+</li>
+</apex:repeat>
+</ul>
+-->
+            
+            
+            
+            
+            
+            <br/>
+            <br/>
+            <apex:pageBlockSection title="UPLOAD EXTRA FILES?" >
+                <div style="font-weight: bold;width:100%">&nbsp;
+                    <div style="width:33%">
+                        <apex:inputFile style="width:100%" value="{!fileAttachment1body}" fileName="{!fileAttachment1name}"></apex:inputFile>
+                    </div>
+                    <div style="width:33%">
+                        <apex:inputFile style="width:100%" value="{!fileAttachment2body}" fileName="{!fileAttachment2name}"></apex:inputFile>
+                    </div>
+                    <div style="width:33%">
+                        <apex:inputFile style="width:100%" value="{!fileAttachment3body}" fileName="{!fileAttachment3name}"></apex:inputFile>
+                    </div>
+                    
+                </div>
+            </apex:pageBlockSection>
+            
+            
+            
+            <br /><br />
+            <apex:outputLabel title="Add Primary Email Addresses, separated by a semi-colon ( ; )"  value="Recipients" for="Recipients"/>:<br />     
+            <apex:inputText title="Add Primary Email Addresses, separated by a semi-colon ( ; )" style="width:80%" value="{!recipientsString}" id="recipientsString" maxlength="1000"/>
+            <br /><br />
+            <apex:outputLabel title="Add Non-Primary Email Addresses, separated by a semi-colon ( ; )"  value="CC" for="CC"/>:<br />     
+            <apex:inputText title="Add Non-Primary Email Addresses, separated by a semi-colon ( ; )" style="width:80%" value="{!ccAddressString}" id="ccAddressString" maxlength="1000"/>
+            <br /><br />
+            <apex:outputLabel title="Add BCC Email Addresses, separated by a semi-colon ( ; )"  value="BCC" for="BCC"/>:<br />     
+            <apex:inputText title="Add BCC Email Addresses, separated by a semi-colon ( ; )" style="width:80%" value="{!bccAddressString}" id="bccAddressString" maxlength="1000"/>
+            <br /><br />
+            <apex:outputLabel value="Subject" for="Subject"/>:<br />     
+            <apex:inputText title="Email Subject" style="width:80%"  value="{!subjectString}" id="Subject" maxlength="80"/>
+            <br /><br />
+            <apex:outputLabel value="Body" for="Body"/>:<br />     
+            <apex:inputTextarea title="Email Body" richText="true" style="width:80%"  value="{!body}" id="Body"  rows="20" /> <!-- cols="80" -->           
+            <br /><br /><br />
+            <apex:commandButton value="Send Email" action="{!send}" />
+            
+        </apex:pageBlock>
+    </apex:form>
+    
+    
+    <apex:pageBlock title="Quote PDF Attachments" rendered="{!renderQuotePDFPageBlock}">
+        
+        <apex:repeat value="{!map_QuoteId_ContentVersion}" var="qkey">
+            
+            <div style="border:solid thin blue">
+                
+                
+                
+                <apex:outputLink html-class="form_elem" value="{!'/' + qkey}">
+                    {!mapQuotes[qkey].Name} [ {!qkey} ]
+                </apex:outputLink>
+                
+                <div>
+                    <div>
+                        Attached File: &nbsp;&nbsp; {!map_QuoteId_ContentVersion[qkey].Title}.pdf
+                    </div>
+                    
+                    <apex:variable var="qpageNum" value="{!0}"/>
+                    <apex:repeat value="{!quotePageBlanks}" rows="{!10}" > 
+                        
+                        <apex:image html-onerror="this.parentNode.removeChild(this)"
+                                    width="50%" url="/sfc/servlet.shepherd/version/renditionDownload?rendition=SVGZ&versionId={!map_QuoteId_ContentVersion[qkey].Id}&page={!qpageNum}"/>
+                        
+                        <apex:variable var="qpageNum" value="{!qpageNum+1}"/>
+                        
+                    </apex:repeat>
+                    
+                </div> 
+                
+                
+            </div>
+            <br/>
+            <br/>
+            
+        </apex:repeat>
+        
+        
+        
+    </apex:pageBlock>
+    
+    <apex:pageBlock title="Product Specification Attachments" rendered="{!renderProductAttachmentsPageBlock}">
+        
+        <apex:variable var="row" value="{!1}" /> 
+        
+        <apex:repeat value="{!map_QuoteProduct_Wrappers}" var="key" >
+            
+            
+            <br/>
+            <br/>
+            <br/>
+            <br/>
+            <br/>
+            <br/>
+            <apex:outputLink html-class="form_elem" value="{!'/' + key}">
+                {!mapQuotes[key].Name}
+            </apex:outputLink>
+            
+            
+            
+            <apex:repeat value="{!map_QuoteProduct_Wrappers[key]}" var="PDFList">
+                
+                
+                
+                <apex:repeat value="{!PDFList}" var="wrapper" >
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    <br/>
+                    <br/>
+                    <table>
+                        <!--<thead>
+<th>
+QUOTE
+</th>
+<th>
+SPEC
+</th>
+</thead>-->
+                        <tr>
+                            <td>
+                                <apex:outputLink value="{!'/' + key}">
+                                    [{!mapQuotes[key].Name}]
+                                </apex:outputLink>
+                            </td>
+                            <td>
+                                [{!mapContentVersion[wrapper.ContentVersionId].Title}]
+                            </td>
+                            
+                            
+                            <td>
+                                [SPECIFICATION #{!row}]
+                            </td>
+                            <td>
+                                <apex:outputLink value="{!wrapper.SpecSheetAddress}">
+                                    [{!wrapper.SpecSheetAddress}]
+                                </apex:outputLink>
+                            </td>
+                        </tr>
+                        
+                    </table>
+                    
+                    
+                    
+                    
+                    
+                    <div>
+                        
+                        
+                        <apex:variable var="pageNum" value="{!0}"/>
+                        <apex:repeat value="{!productPageBlanks}" rows="{!10}" > 
+                            
+                            <apex:image html-onerror="this.parentNode.removeChild(this)"
+                                        width="25%" url="/sfc/servlet.shepherd/version/renditionDownload?rendition=SVGZ&versionId={!wrapper.contentVersionId}&page={!pageNum}"/>
+                            
+                            <apex:variable var="pageNum" value="{!pageNum+1}"/>
+                            
+                            
+                            
+                        </apex:repeat>
+                        
+                    </div>             
+                    
+                    <apex:variable var="row" value="{!row+1}"/> 
+                    
+                    
+                </apex:repeat>
+                
+            </apex:repeat>
+            
+            <apex:variable var="row" value="{!1}"/> 
+            
+        </apex:repeat>
+        
+    </apex:pageBlock>
+    
+</apex:page>
